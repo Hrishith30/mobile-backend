@@ -1,14 +1,11 @@
 import axios from 'axios';
 import { supabase } from '../config/supabase.js';
 import dotenv from 'dotenv';
-import OpenAI from 'openai';
 import { getDistanceInMiles } from '../utils/geolocation.js';
 
 dotenv.config();
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// This function is for finding places
 export const getNearbyPlaces = async (req, res) => {
   try {
     const { type, latitude, longitude } = req.body;
@@ -31,8 +28,8 @@ export const getNearbyPlaces = async (req, res) => {
     }
     
     const radiusInMeters = 32186; // 20 miles
-    const userLat = latitude;     
-    const userLng = longitude;    
+    const userLat = latitude;
+    const userLng = longitude;
 
     const query = `
       [out:json][timeout:25];
@@ -110,41 +107,5 @@ export const addSafetyTip = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error submitting tip' });
-  }
-};
-
-// --- [REWRITTEN] This function is now fixed ---
-export const getSafetyAdvice = async (req, res) => {
-  try {
-    // --- THIS IS THE FIX ---
-    // 1. Get location data AND type/situation from req.body
-    const { location_type, situation, latitude, longitude } = req.body;
-
-    // 2. Validate all 4 fields
-    if (!location_type || !situation || !latitude || !longitude) {
-      return res.status(400).json({ message: 'Location type, situation, latitude, and longitude are required' });
-    }
-
-    // 3. Removed the bad database query for the user's location
-    // --- END OF FIX ---
-
-    const prompt = `
-You are a helpful assistant giving **non-medical safety advice**.
-The user is near a ${location_type} at coordinates (${latitude}, ${longitude}).
-The user is facing the following situation: ${situation}.
-Provide **short, practical safety tips** relevant to their location.
-`;
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 200
-    });
-
-    const advice = completion.choices[0]?.message?.content || 'No advice available';
-    res.json({ advice });
-  } catch (error) {
-    console.error('OpenAI Error:', error);
-    res.status(500).json({ message: 'Error generating advice' });
   }
 };
