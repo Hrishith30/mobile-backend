@@ -10,18 +10,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const getNearbyPlaces = async (req, res) => {
   try {
-    // --- THIS IS THE FIX ---
-    // 1. Get location data AND type directly from the app's req.body
+    // This function is correct:
     const { type, latitude, longitude } = req.body;
 
     if (!type || !latitude || !longitude) {
       return res.status(400).json({ message: 'Type, latitude, and longitude are required.' });
     }
     
-    // 2. Remove the query to get the user from Supabase
-    //    (No longer needed)
-    // --- END OF FIX ---
-
     const typeToOverpassTag = {
       police: '[amenity=police]',
       hospital: '[amenity=hospital]',
@@ -36,8 +31,8 @@ export const getNearbyPlaces = async (req, res) => {
     }
     
     const radiusInMeters = 32186; // 20 miles
-    const userLat = latitude;     // Use latitude from req.body
-    const userLng = longitude;    // Use longitude from req.body
+    const userLat = latitude;
+    const userLng = longitude;
 
     const query = `
       [out:json][timeout:25];
@@ -96,7 +91,7 @@ export const getNearbyPlaces = async (req, res) => {
   }
 };
 
-// --- (addSafetyTip and getSafetyAdvice remain unchanged) ---
+// --- (addSafetyTip remains unchanged) ---
 export const addSafetyTip = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -118,28 +113,24 @@ export const addSafetyTip = async (req, res) => {
   }
 };
 
+// --- [REWRITTEN] This function is now fixed ---
 export const getSafetyAdvice = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { location_type, situation } = req.body;
+    // --- THIS IS THE FIX ---
+    // 1. Get location data AND type/situation from req.body
+    const { location_type, situation, latitude, longitude } = req.body;
 
-    if (!location_type || !situation) {
-      return res.status(400).json({ message: 'location_type and situation are required' });
+    // 2. Validate all 4 fields
+    if (!location_type || !situation || !latitude || !longitude) {
+      return res.status(400).json({ message: 'Location type, situation, latitude, and longitude are required' });
     }
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('latitude, longitude')
-      .eq('id', userId)
-      .single();
-
-    if (userError || !user || user.latitude === null || user.longitude === null) {
-      return res.status(400).json({ message: 'User location not set' });
-    }
+    // 3. Removed the bad database query for the user's location
+    // --- END OF FIX ---
 
     const prompt = `
 You are a helpful assistant giving **non-medical safety advice**.
-The user is near a ${location_type} at coordinates (${user.latitude}, ${user.longitude}).
+The user is near a ${location_type} at coordinates (${latitude}, ${longitude}).
 The user is facing the following situation: ${situation}.
 Provide **short, practical safety tips** relevant to their location.
 `;
@@ -153,7 +144,7 @@ Provide **short, practical safety tips** relevant to their location.
     const advice = completion.choices[0]?.message?.content || 'No advice available';
     res.json({ advice });
   } catch (error) {
-    console.error(error);
+    console.error('OpenAI Error:', error);
     res.status(500).json({ message: 'Error generating advice' });
   }
 };
