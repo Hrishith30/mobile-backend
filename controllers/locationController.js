@@ -8,9 +8,9 @@ dotenv.config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// This function is for finding places
 export const getNearbyPlaces = async (req, res) => {
   try {
-    // This function is correct:
     const { type, latitude, longitude } = req.body;
 
     if (!type || !latitude || !longitude) {
@@ -31,8 +31,8 @@ export const getNearbyPlaces = async (req, res) => {
     }
     
     const radiusInMeters = 32186; // 20 miles
-    const userLat = latitude;
-    const userLng = longitude;
+    const userLat = latitude;     
+    const userLng = longitude;    
 
     const query = `
       [out:json][timeout:25];
