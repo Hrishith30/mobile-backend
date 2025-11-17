@@ -5,7 +5,6 @@ import { getDistanceInMiles } from '../utils/geolocation.js';
 
 dotenv.config();
 
-
 export const getNearbyPlaces = async (req, res) => {
   try {
     const { type, latitude, longitude } = req.body;
