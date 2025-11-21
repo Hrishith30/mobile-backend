@@ -30,7 +30,7 @@ export const getNearbyPlaces = async (req, res) => {
     const userLat = latitude;
     const userLng = longitude;
 
-    // FIX: Reduced timeout from 25 to 15 seconds for better client experience
+    // FIX: Reduced timeout to 15 seconds for better client experience
     const query = `
       [out:json][timeout:15];
       (
@@ -40,12 +40,21 @@ export const getNearbyPlaces = async (req, res) => {
       );
       out center 10;
     `;
+    
+    // --- DIAGNOSTIC 1: Check before Overpass API call ---
+    console.log('Diagnostic 1: Attempting call to Overpass API...');
+    console.log('Query:', query.trim().replace(/\s+/g, ' '));
+    // --- END DIAGNOSTIC 1 ---
 
     const response = await axios.post(
       'https://overpass-api.de/api/interpreter',
       query,
       { headers: { 'Content-Type': 'text/plain' } }
     );
+
+    // --- DIAGNOSTIC 2: Check after successful Overpass response ---
+    console.log(`Diagnostic 2: Overpass successful. Elements received: ${response.data.elements.length}`);
+    // --- END DIAGNOSTIC 2 ---
 
     const places = response.data.elements.map(element => {
       let lat, lon;
@@ -72,25 +81,41 @@ export const getNearbyPlaces = async (req, res) => {
     places.sort((a, b) => a.distance - b.distance);
 
     if (places.length > 0) {
+        // --- DIAGNOSTIC 3: Check before Supabase Upsert ---
+        console.log(`Diagnostic 3: Attempting Supabase upsert for ${places.length} places.`);
+        // --- END DIAGNOSTIC 3 ---
+
       await supabase.from('locations').upsert(
         places.map((p) => ({ 
           name: p.name, type, latitude: p.latitude, longitude: p.longitude 
         })),
         { onConflict: ['name', 'type'] }
       );
+        // --- DIAGNOSTIC 4: Check after successful Supabase Upsert ---
+        console.log('Diagnostic 4: Supabase upsert complete.');
+        // --- END DIAGNOSTIC 4 ---
     }
 
     res.json({ places });
 
   } catch (error) {
-    // CRITICAL DIAGNOSTIC: Provide better server log information
-    console.error('Error fetching nearby places (Overpass/Supabase):', 
-                     error.response?.data || error.message);
+    // --- CRITICAL DIAGNOSTIC 5: Log the failure reason ---
+    console.error('Error fetching nearby places (FATAL):');
+    if (error.response) {
+        console.error('Response Status:', error.response.status);
+        console.error('Response Data:', error.response.data);
+    } else if (error.message.includes('timeout')) {
+        console.error('Network Error: Request timed out.');
+    } else {
+        console.error('General Error:', error.message);
+    }
+    // --- END CRITICAL DIAGNOSTIC 5 ---
+
     res.status(500).json({ message: 'Error fetching nearby places' });
   }
 };
 
-// --- ADD SAFETY TIP (remains unchanged from last working version) ---
+// --- ADD SAFETY TIP (remains unchanged) ---
 export const addSafetyTip = async (req, res) => {
   try {
     const userId = req.user.id;
