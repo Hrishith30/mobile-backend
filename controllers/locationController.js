@@ -30,8 +30,9 @@ export const getNearbyPlaces = async (req, res) => {
     const userLat = latitude;
     const userLng = longitude;
 
+    // FIX: Reduced timeout from 25 to 15 seconds for better client experience
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:15];
       (
         node${overpassTag}(around:${radiusInMeters},${userLat},${userLng});
         way${overpassTag}(around:${radiusInMeters},${userLat},${userLng});
@@ -82,12 +83,14 @@ export const getNearbyPlaces = async (req, res) => {
     res.json({ places });
 
   } catch (error) {
-    console.error('Overpass API Error:', error.response?.data || error.message);
+    // CRITICAL DIAGNOSTIC: Provide better server log information
+    console.error('Error fetching nearby places (Overpass/Supabase):', 
+                     error.response?.data || error.message);
     res.status(500).json({ message: 'Error fetching nearby places' });
   }
 };
 
-// --- ADD SAFETY TIP (UPDATED: Removed location handling) ---
+// --- ADD SAFETY TIP (remains unchanged from last working version) ---
 export const addSafetyTip = async (req, res) => {
   try {
     const userId = req.user.id;
