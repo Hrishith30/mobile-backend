@@ -5,19 +5,19 @@ import { getDistanceInMiles } from '../utils/geolocation.js';
 
 dotenv.config();
 
-// --- Helper function to fetch from Supabase cache ---
+// --- Helper function to fetch from Supabase cache (Fallback) ---
 const fetchCachedPlaces = async (type) => {
     try {
         const { data, error } = await supabase
             .from('locations')
             .select('*')
             .eq('type', type)
-            .limit(10); // Limit results for performance
+            .limit(20); // Fetch reasonable number of cached items
         
         if (error) throw error;
         
         console.log(`[NEARBY PLACES] Fallback: Returning ${data.length} places from Supabase cache.`);
-        // Format cached data to match the expected structure (distance is null/0)
+        // Format cached data to match the expected structure
         return data.map(p => ({
             name: p.name,
             latitude: p.latitude,
@@ -37,7 +37,7 @@ export const getNearbyPlaces = async (req, res) => {
         return res.status(400).json({ message: 'Type, latitude, and longitude are required.' });
     }
     
-    // FIX: Reject zero coordinates to prevent Overpass errors
+    // 1. Check for invalid coordinates (0,0) and fallback immediately
     if (latitude === 0 && longitude === 0) {
         console.warn('[NEARBY PLACES] Coordinates are (0, 0). Falling back to cache.');
         const cached = await fetchCachedPlaces(type);
@@ -81,8 +81,6 @@ export const getNearbyPlaces = async (req, res) => {
             { headers: { 'Content-Type': 'text/plain' } }
         );
 
-        console.log(`[NEARBY PLACES] Overpass successful. Elements received: ${response.data.elements.length}`);
-
         const places = response.data.elements.map(element => {
             let lat, lon;
             if (element.type === 'node') {
@@ -108,34 +106,24 @@ export const getNearbyPlaces = async (req, res) => {
         places.sort((a, b) => a.distance - b.distance);
 
         if (places.length > 0) {
-            console.log(`[NEARBY PLACES] Upserting ${places.length} places to Supabase.`);
-            // Using upsert without explicitly checking for existence is optimized
+            // Update cache asynchronously (don't block response significantly)
             await supabase.from('locations').upsert(
                 places.map((p) => ({ 
                     name: p.name, type, latitude: p.latitude, longitude: p.longitude 
                 })),
                 { onConflict: ['name', 'type'] }
-            );
-            console.log('[NEARBY PLACES] Supabase upsert complete.');
+            ).catch(err => console.error('Cache update failed', err));
         }
 
         res.json({ places });
 
     } catch (error) {
         // --- Fallback Mechanism ---
-        console.error('--- Overpass API or Primary DB Call Failed. Attempting Fallback. ---');
-        
-        if (error.response) {
-            console.error(`Overpass Status: ${error.response.status}`);
-            console.error('Overpass Error Body:', error.response.data);
-        } else {
-            console.error('General Error:', error.message);
-        }
+        console.error('Overpass API failed:', error.message);
         
         const cached = await fetchCachedPlaces(type);
         
         if (cached.length > 0) {
-            // Success: Return cached data instead of failing completely
             return res.json({ places: cached });
         }
 
