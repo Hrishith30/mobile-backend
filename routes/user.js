@@ -7,7 +7,8 @@ import {
   updateSafetyTip,
   deleteSafetyTip,
   updateLocation,
-  // --- 'getAllUsers' import removed ---
+  // 🎯 NEW: Import the creation controller
+  createSafetyTip, 
 } from '../controllers/userController.js';
 import { verifyToken } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -24,11 +25,10 @@ router.get('/profile', verifyToken, getProfile);
 router.put('/profile', verifyToken, validate(updateProfileSchema), updateProfile);
 router.delete('/profile', verifyToken, deleteAccount);
 
-// --- 'POST /all' route removed ---
-
 // --- Safety tips routes ---
 const updateTipSchema = Joi.object({
-  tip_id: Joi.string().uuid().required(),
+  // tip_id is optional for POST/Creation, required for PUT/Update
+  tip_id: Joi.string().uuid().optional(), 
   tip: Joi.string().min(5).required()
 });
 
@@ -37,6 +37,10 @@ const deleteTipSchema = Joi.object({
 });
 
 router.get('/tips', verifyToken, getMySafetyTips); 
+
+// 🎯 REQUIRED FIX: Add the POST route for creation
+router.post('/tips', verifyToken, validate(updateTipSchema), createSafetyTip); 
+
 router.put('/tips', verifyToken, validate(updateTipSchema), updateSafetyTip);
 router.delete('/tips', verifyToken, validate(deleteTipSchema), deleteSafetyTip);
 
